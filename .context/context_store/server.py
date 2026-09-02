@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import functools
+import logging
+import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import Body, FastAPI
 from fastapi.responses import JSONResponse
 from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from .store import Store
 
@@ -25,6 +29,19 @@ mcp = MCPServer(
 )
 
 
+def _surface(fn):
+    """Validation failures are the caller's to fix, so hand the message to the model instead of a bare 'error'."""
+
+    @functools.wraps(fn)
+    def wrapper(*a, **kw):
+        try:
+            return fn(*a, **kw)
+        except (ValueError, KeyError) as e:
+            raise ToolError(str(e)) from e
+
+    return wrapper
+
+
 def _client(ctx: Context) -> str:
     try:
         info = ctx.session.client_params.client_info
@@ -34,6 +51,7 @@ def _client(ctx: Context) -> str:
 
 
 @mcp.tool()
+@_surface
 def write(text: str, scope: str = "main", tags: list[str] | None = None, source: str = "", ctx: Context = None) -> dict:
     """Save one fact, decision, gotcha or preference so later sessions of any model can recall it.
     Keep it to a sentence or two. tags are free-form labels such as ["decision", "db"]."""
@@ -41,6 +59,7 @@ def write(text: str, scope: str = "main", tags: list[str] | None = None, source:
 
 
 @mcp.tool()
+@_surface
 def select(query: str = "", scope: str = "main", k: int = 8, tags: list[str] | None = None) -> list[dict]:
     """Recall memories. With a query: semantic search, best first, each with a score.
     Without a query: the k newest. tags keeps only memories carrying any of them. Call this before starting work."""
@@ -48,6 +67,7 @@ def select(query: str = "", scope: str = "main", k: int = 8, tags: list[str] | N
 
 
 @mcp.tool()
+@_surface
 def compress(scope: str = "main", ids: list[str] | None = None, summary: str = "", threshold: float = 0.92) -> dict:
     """Shrink memory. ids + summary: replace those memories (from any scope) with one summary written to scope.
     Neither: near-duplicates inside scope are merged automatically, newest kept, and the merges reported."""
@@ -55,6 +75,7 @@ def compress(scope: str = "main", ids: list[str] | None = None, summary: str = "
 
 
 @mcp.tool()
+@_surface
 def isolate(scope: str, seed_from: str = "", query: str = "", k: int = 8, tags: list[str] | None = None) -> dict:
     """Open a private scope for a sub-task or agent. seed_from + query copies the k most relevant memories
     of another scope into it. Then write/select with scope=<name>, and compress its ids into main when done."""
@@ -106,6 +127,8 @@ def main():
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8765)
     a = p.parse_args()
+    # stderr is what MCP clients capture into their logs; without a handler tool errors vanish
+    logging.basicConfig(level=logging.WARNING, stream=sys.stderr, format="%(levelname)s %(name)s: %(message)s")
     if a.cmd == "mcp":
         mcp.run()
     else:

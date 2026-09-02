@@ -56,6 +56,7 @@ Scope names are `[a-z0-9._-]`, one JSONL file each. `main` is the shared default
 
 - Test the install on a new machine: `uv run --group dev pytest`.
 - Delete a memory by removing its line from the JSONL. The index resyncs on the next call.
+- Deleting `index.db` or `.venv/` under a running server strands its open handles. Restart it (Claude Code: `/mcp`, reconnect). Tool errors land in the client's MCP log via stderr.
 - Merge conflicts in a JSONL: keep both sides, ids are unique, then run `compress()`.
 - `CONTEXT_EMBED_MODEL` picks any fastembed model. Changing it rebuilds the index.
 - The server holds no LLM. Summaries come from the model calling `compress`, so any model can be the summariser.
