@@ -2,7 +2,15 @@
   "mcpServers": {
     "context": {
       "command": "uv",
-      "args": ["run", "--project", ".context", "context", "mcp"]
+      "args": [
+        "run",
+        "--directory",
+        ".context",
+        "python",
+        "-m",
+        "context_store.server",
+        "mcp"
+      ]
     }
   }
 }

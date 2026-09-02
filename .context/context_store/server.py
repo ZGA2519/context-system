@@ -134,3 +134,10 @@ def main():
         mcp.run()
     else:
         uvicorn.run(api, host=a.host, port=a.port)
+
+
+# `python -m context_store.server` is how .mcp.json starts the server: it finds the
+# package through the working directory, not through the editable install's .pth file,
+# which macOS can hide (UF_HIDDEN) and Python's site machinery then silently skips.
+if __name__ == "__main__":
+    main()

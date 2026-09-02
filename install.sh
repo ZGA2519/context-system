@@ -94,7 +94,7 @@ if p.exists() and p.read_text().strip():
         doc = json.loads(p.read_text())
     except json.JSONDecodeError as e:
         sys.exit(f"{p} is not valid JSON ({e}); fix or move it and re-run")
-want = {"command": "uv", "args": ["run", "--project", ".context", "context", "mcp"]}
+want = {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}
 servers = doc.setdefault("mcpServers", {})
 if servers.get("context") == want:
     print("already present")
@@ -108,7 +108,7 @@ PY
   echo "  .mcp.json                    mcpServers.context $result"
 else
   echo "  .mcp.json                    SKIPPED, no python3 — add by hand:" >&2
-  echo '    {"mcpServers": {"context": {"command": "uv", "args": ["run", "--project", ".context", "context", "mcp"]}}}' >&2
+  echo '    {"mcpServers": {"context": {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}}}' >&2
 fi
 
 # --- skill and commands ----------------------------------------------------
