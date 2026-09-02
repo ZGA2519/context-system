@@ -54,6 +54,7 @@ Scope names are `[a-z0-9._-]`, one JSONL file each. `main` is the shared default
 
 ## Notes
 
+- Test the install on a new machine: `uv run --group dev pytest`.
 - Delete a memory by removing its line from the JSONL. The index resyncs on the next call.
 - Merge conflicts in a JSONL: keep both sides, ids are unique, then run `compress()`.
 - `CONTEXT_EMBED_MODEL` picks any fastembed model. Changing it rebuilds the index.

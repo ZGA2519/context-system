@@ -22,6 +22,9 @@ build-backend = "uv_build"
 module-name = "context_store"
 module-root = ""
 
+[tool.uv]
+default-groups = []  # consumers get no pytest, test with: uv run --group dev pytest
+
 [dependency-groups]
 dev = ["pytest>=9"]
 
