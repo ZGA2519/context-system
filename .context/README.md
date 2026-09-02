@@ -26,13 +26,13 @@ Needs [uv](https://docs.astral.sh/uv/). The first `uv run` builds `.venv/` and d
 Claude Code reads `.mcp.json` and starts the server itself. Any other MCP client over stdio:
 
 ```sh
-uv run --project .context context mcp
+uv run --directory .context python -m context_store.server mcp
 ```
 
 As a service, JSON API with docs at `/docs` and MCP at `/mcp`:
 
 ```sh
-uv run --project .context context serve            # http://127.0.0.1:8765
+uv run --directory .context python -m context_store.server serve            # http://127.0.0.1:8765
 curl -s localhost:8765/select -d '{"query":"how is auth done"}' -H 'content-type: application/json'
 ```
 

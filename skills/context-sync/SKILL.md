@@ -9,7 +9,7 @@ The `context` MCP server is a shared project memory: `memories/<scope>.jsonl` co
 
 ## The server
 
-Launched by `.mcp.json` at the repo root as `uv run --project .context context mcp`. Four tools:
+Launched by `.mcp.json` at the repo root as `uv run --directory .context python -m context_store.server mcp`. Four tools:
 
 | tool | args | use |
 | --- | --- | --- |
