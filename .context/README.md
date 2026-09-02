@@ -11,7 +11,9 @@ context_store/server.py  MCP server (stdio or HTTP) and a JSON API over the same
 
 ## Install in a project
 
-Copy this folder to the repo root as `.context/` and put `.mcp.json` next to it:
+From the context-system checkout, `./install.sh /path/to/your-repo` does this and
+the `context-sync` skill in one step. By hand: copy this folder to the repo root as
+`.context/` and put `.mcp.json` next to it:
 
 ```json
 {"mcpServers": {"context": {"command": "uv", "args": ["run", "--project", ".context", "context", "mcp"]}}}

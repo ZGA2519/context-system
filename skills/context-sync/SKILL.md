@@ -24,7 +24,7 @@ Scope names are `[a-z0-9._-]`, 64 chars max, one JSONL file each. `main` is the 
 
 1. Check the server answers: `select(query="", k=3)`. If the call errors, report that and **do not** turn sync on — say what failed and suggest `/mcp` to reconnect.
 2. Prime the session: `select(query=<what this session is about>, k=8)`. If the user gave no topic yet, the empty query from step 1 is enough.
-3. If a `.context/` directory exists, `echo full > .context/.sync-on`, and append `.sync-on` to `.context/.gitignore` if it isn't already there. This is the flag the optional hook reads, and its contents are the mode; harmless without the hook.
+3. If a `.context/` directory exists, `echo full > .context/.sync-on`. This is the flag the hook reads, and its contents are the mode; harmless without the hook. It's gitignored by the install.
 4. Report in one line what came back, then run the loop below on **every** following prompt until `context-stop-sync`.
 
 ## Command: context-start-sync-readonly
@@ -32,7 +32,7 @@ Scope names are `[a-z0-9._-]`, 64 chars max, one JSONL file each. `main` is the 
 Same as `context-start-sync` with capture switched off: recall on every prompt, write nothing, ever. For working in someone else's repo, on a branch whose decisions aren't settled, or any session whose reasoning shouldn't end up in a committed store.
 
 1. Steps 1 and 2 above, unchanged.
-2. `echo readonly > .context/.sync-on` instead of `full`, same `.gitignore` line.
+2. `echo readonly > .context/.sync-on` instead of `full`.
 3. Report that sync is on in read-only mode, then run the loop with the **Capture** half skipped.
 
 While read-only:
@@ -100,15 +100,9 @@ A tool error or an unreachable server: say it once, treat sync as off, carry on 
 
 ## Making it survive a long session
 
-These instructions live in context, so on a long or heavily compacted session the loop can quietly fade. For a hard guarantee, install the hook in `hooks/` — it re-injects the loop on every prompt as long as `.context/.sync-on` exists:
+These instructions live in context, so on a long or heavily compacted session the loop can quietly fade. The hard guarantee is the `UserPromptSubmit` hook at `.claude/hooks/context-sync.sh`, which re-injects the loop on every prompt as long as `.context/.sync-on` exists. `install.sh` puts it there and registers it in `.claude/settings.json`; if this repo was set up by hand or with `--no-hook`, re-run `./install.sh <this repo>` from the context-system checkout to add it. Claude Code CLI only — Cowork does not fire hooks, so there the skill-only path is all there is.
 
-```sh
-mkdir -p .claude/hooks && cp hooks/context-sync.sh .claude/hooks/ && chmod +x .claude/hooks/context-sync.sh
-```
-
-Then merge `hooks/settings-snippet.json` into `.claude/settings.json`. Claude Code CLI only — Cowork does not fire hooks, so there the skill-only path is all there is.
-
-For real slash commands, `cp commands/*.md .claude/commands/`. Without that, typing the command name as plain text works just as well.
+The three command names are real slash commands when `install.sh` has run (they live in `.claude/commands/`, which is the only place Claude Code looks — command files sitting inside a skill folder are never registered). Without them, typing the command name as plain text works just as well.
 
 ## Tuning
 
