@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "context": {
+      "command": "uv",
+      "args": ["run", "--project", ".context", "context", "mcp"]
+    }
+  }
+}
