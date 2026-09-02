@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Install the context system into a repo: store, MCP entry, skill, commands, hook.
-# Idempotent — re-run to update an install. Never overwrites .context/memories/.
+# Idempotent — re-run to update an install. An existing .context/memories/ is never touched.
 set -eu
 
 SRC=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -50,7 +50,7 @@ HOOK_CMD='"$CLAUDE_PROJECT_DIR"/.claude/hooks/context-sync.sh'
 echo "installing the context system into $TARGET"
 
 # --- .context/ -------------------------------------------------------------
-# Everything but memories/, which is the user's data and is merged file by file.
+# Everything but memories/, which is the user's data and is handled separately below.
 (cd "$SRC" && tar cf - \
     --exclude '.context/.venv' \
     --exclude '.context/index.db*' \
@@ -62,18 +62,26 @@ echo "installing the context system into $TARGET"
     .context) | (cd "$TARGET" && tar xf -)
 echo "  .context/                    server, store code, pyproject"
 
-mkdir -p "$TARGET/.context/memories"
-for f in "$SRC"/.context/memories/*.jsonl; do
-  [ -e "$f" ] || continue
-  base=$(basename "$f")
-  if [ -e "$TARGET/.context/memories/$base" ]; then
-    n=$(grep -c '' "$TARGET/.context/memories/$base" || true)
-    echo "  .context/memories/$base kept, $n stored"
-  else
+# --- .context/memories/ ----------------------------------------------------
+# The user's data. If memories/ is already there we do not touch it at all: no
+# seeding, no merging, no new files. Only a fresh install gets the seed stores.
+if [ -e "$TARGET/.context/memories" ]; then
+  [ -d "$TARGET/.context/memories" ] || {
+    echo "install: $TARGET/.context/memories exists but is not a directory" >&2
+    exit 1
+  }
+  n=$(find "$TARGET/.context/memories" -type f -name '*.jsonl' | wc -l | tr -d ' ')
+  echo "  .context/memories/           left untouched, $n store(s) already there"
+else
+  mkdir -p "$TARGET/.context/memories"
+  echo "  .context/memories/           created"
+  for f in "$SRC"/.context/memories/*.jsonl; do
+    [ -e "$f" ] || continue
+    base=$(basename -- "$f")
     cp "$f" "$TARGET/.context/memories/$base"
     echo "  .context/memories/$base new empty store"
-  fi
-done
+  done
+fi
 
 # --- .mcp.json -------------------------------------------------------------
 if [ "$HAVE_PY" = 1 ]; then
