@@ -38,7 +38,7 @@ curl -s localhost:8765/select -d '{"query":"how is auth done"}' -H 'content-type
 
 | op | args | does |
 | --- | --- | --- |
-| `write` | text, scope=main, tags | Save one fact. Returns the memory with its id. |
+| `write` | text, scope=main, tags, id | Save one fact. Returns the memory with its id. Pass an existing `id` to correct that memory in place. |
 | `select` | query, scope=main, k=8, tags | Semantic search, best first with a score. Empty query lists the k newest. |
 | `compress` | scope, ids, summary, threshold=0.92 | ids + summary: replace them with one summary in scope. Nothing: merge near-duplicates, newest kept. |
 | `isolate` | scope, seed_from, query, k, tags | Open a private scope, optionally seeded with the top k memories of another. |

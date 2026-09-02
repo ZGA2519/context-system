@@ -64,12 +64,17 @@ class Store:
     # ---- the four operations ------------------------------------------------
 
     @_serialized
-    def write(self, text: str, scope: str = "main", tags=(), source: str = "", supersedes=(), origin: str = "") -> dict:
+    def write(self, text: str, scope: str = "main", tags=(), source: str = "", supersedes=(), origin: str = "", id: str = "") -> dict:
+        """Append a memory. With id: replace that memory in place, same id, new ts, old tags and source unless given."""
         scope = self._scope(scope)
         text = text.strip()
         if not text:
             raise ValueError("text is empty")
-        rec = {"id": uuid.uuid4().hex[:12], "ts": _now(), "text": text, "tags": sorted(set(tags)), "source": source}
+        if id:
+            old = self._remove([id])[0]
+            tags, source = tags or old["tags"], source or old["source"]
+            supersedes, origin = supersedes or old.get("supersedes", ()), origin or old.get("origin", "")
+        rec = {"id": id or uuid.uuid4().hex[:12], "ts": _now(), "text": text, "tags": sorted(set(tags)), "source": source}
         if supersedes:
             rec["supersedes"] = list(supersedes)
         if origin:

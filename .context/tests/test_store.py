@@ -6,12 +6,17 @@ from context_store.store import Store
 def test_write_select_compress_isolate(tmp_path: Path):
     s = Store(tmp_path)
     a = s.write("Passwords are hashed with argon2-cffi", tags=["auth"], source="test")
-    s.write("Frontend is React + Vite behind nginx", tags=["front"])
+    b = s.write("Frontend is React + Vite behind nginx", tags=["front"])
     s.write("Password hashing uses argon2 via argon2-cffi", tags=["auth"])  # near-duplicate of a
 
     hit = s.select("how are passwords stored")
     assert hit[0]["tags"] == ["auth"] and hit[0]["score"] > hit[-1]["score"]
     assert [r["tags"] for r in s.select("anything", tags=["front"])] == [["front"]]
+
+    # write with an id corrects in place: same id, new text, tags kept, index follows
+    up = s.write("Frontend is React 19 + Vite behind nginx", id=b["id"])
+    assert up["id"] == b["id"] and up["tags"] == ["front"]
+    assert "19" in s.select("frontend framework", k=1)[0]["text"] and len(s.select("", k=10)) == 3
 
     # compress without a summary merges near-duplicates and keeps the newest
     assert s.compress(threshold=0.85)["removed"] == [a["id"]]

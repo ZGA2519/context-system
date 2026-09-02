@@ -52,10 +52,11 @@ def _client(ctx: Context) -> str:
 
 @mcp.tool()
 @_surface
-def write(text: str, scope: str = "main", tags: list[str] | None = None, source: str = "", ctx: Context = None) -> dict:
+def write(text: str, scope: str = "main", tags: list[str] | None = None, source: str = "", id: str = "", ctx: Context = None) -> dict:
     """Save one fact, decision, gotcha or preference so later sessions of any model can recall it.
-    Keep it to a sentence or two. tags are free-form labels such as ["decision", "db"]."""
-    return store.write(text, scope, tags or [], source or _client(ctx))
+    Keep it to a sentence or two. tags are free-form labels such as ["decision", "db"].
+    Pass the id of an existing memory to correct it in place: same id, new text, tags kept unless given."""
+    return store.write(text, scope, tags or [], source or _client(ctx), id=id)
 
 
 @mcp.tool()
@@ -100,8 +101,8 @@ def health():
 
 
 @api.post("/write")
-def write_api(text: str = Body(), scope: str = Body("main"), tags: list[str] = Body([]), source: str = Body("")):
-    return store.write(text, scope, tags, source)
+def write_api(text: str = Body(), scope: str = Body("main"), tags: list[str] = Body([]), source: str = Body(""), id: str = Body("")):
+    return store.write(text, scope, tags, source, id=id)
 
 
 @api.post("/select")
