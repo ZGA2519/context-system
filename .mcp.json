@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "context": {
+    "context-system": {
       "command": "uv",
       "args": [
         "run",

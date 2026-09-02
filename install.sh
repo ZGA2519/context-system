@@ -14,11 +14,13 @@ usage: ./install.sh [TARGET_REPO] [--no-hook]
 Installs into TARGET_REPO (default: the current directory):
 
   .context/                             the store and MCP server
-  .mcp.json                             mcpServers.context, merged in
+  .mcp.json                             mcpServers.context-system, merged in
   .claude/skills/context-sync/          the skill
   .claude/commands/context-*.md         /context-start-sync, -readonly, /context-stop-sync
   .claude/hooks/context-sync.sh         per-prompt loop re-injection
   .claude/settings.json                 the UserPromptSubmit hook, merged in
+  .agent/skills/context-sync/           the same skill, vendor-neutral tree
+  .agent/prompts/context-*.md           the same commands, called prompts there
 
   --no-hook   skip the last two; the skill alone drives the loop
 USAGE
@@ -96,19 +98,25 @@ if p.exists() and p.read_text().strip():
         sys.exit(f"{p} is not valid JSON ({e}); fix or move it and re-run")
 want = {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}
 servers = doc.setdefault("mcpServers", {})
-if servers.get("context") == want:
+# the server was called "context" before; drop that key so a re-install does not
+# leave two entries launching two processes against the same store
+legacy = servers.get("context")
+stale = bool(legacy) and legacy.get("command") == "uv" and any(".context" in str(a) for a in legacy.get("args", []))
+if stale:
+    del servers["context"]
+if servers.get("context-system") == want and not stale:
     print("already present")
 else:
-    verb = "replaced" if "context" in servers else "added"
-    servers["context"] = want
+    verb = "replaced" if "context-system" in servers else "added"
+    servers["context-system"] = want
     p.write_text(json.dumps(doc, indent=2) + "\n")
-    print(verb)
+    print(verb + (', legacy "context" entry removed' if stale else ""))
 PY
 )
-  echo "  .mcp.json                    mcpServers.context $result"
+  echo "  .mcp.json                    mcpServers.context-system $result"
 else
   echo "  .mcp.json                    SKIPPED, no python3 — add by hand:" >&2
-  echo '    {"mcpServers": {"context": {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}}}' >&2
+  echo '    {"mcpServers": {"context-system": {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}}}' >&2
 fi
 
 # --- skill and commands ----------------------------------------------------
@@ -126,6 +134,15 @@ for stale in commands hooks; do
 done
 cp "$SRC"/skills/context-sync/commands/*.md "$TARGET/.claude/commands/"
 echo "  .claude/commands/            $(ls -1 "$SRC"/skills/context-sync/commands/*.md | wc -l | tr -d ' ') slash commands"
+
+# --- .agent/ ---------------------------------------------------------------
+# The same skill and commands under the vendor-neutral tree some agents read.
+# Commands are called prompts there, so they land in .agent/prompts/.
+mkdir -p "$TARGET/.agent/skills/context-sync" "$TARGET/.agent/prompts"
+cp "$SRC/skills/context-sync/SKILL.md" "$TARGET/.agent/skills/context-sync/SKILL.md"
+echo "  .agent/skills/context-sync/  SKILL.md"
+cp "$SRC"/skills/context-sync/commands/*.md "$TARGET/.agent/prompts/"
+echo "  .agent/prompts/              $(ls -1 "$SRC"/skills/context-sync/commands/*.md | wc -l | tr -d ' ') prompts"
 
 # --- hook ------------------------------------------------------------------
 if [ "$WANT_HOOK" = 0 ]; then
@@ -162,15 +179,45 @@ PY
   fi
 fi
 
-command -v uv >/dev/null 2>&1 || echo "
+UV=$(command -v uv 2>/dev/null || echo uv)
+[ "$UV" = uv ] && echo "
 note: uv is not on PATH. The server needs it: https://docs.astral.sh/uv/"
 
 cat <<'NEXT'
 
 done. In that repo:
-  1. restart Claude Code, and approve the "context" server when asked (or /mcp)
+  1. restart Claude Code, and approve the "context-system" server when asked (or /mcp)
   2. /context-start-sync          recall + capture every prompt
      /context-start-sync-readonly recall only, never writes
      /context-stop-sync           off
   3. commit .context/memories/ with your code; the rest of .context/ is gitignored
+NEXT
+
+# --- other agents ----------------------------------------------------------
+# Claude Code reads .mcp.json, written above. Every other agent keeps its MCP
+# list somewhere else, and most of them resolve nothing relative to the repo,
+# so these all spell the path out in full.
+SERVER="$UV run --directory $TARGET/.context python -m context_store.server mcp"
+cat <<NEXT
+
+to register the same server with another agent:
+
+  codex        codex mcp add context-system -- $SERVER
+  antigravity  agy mcp add context-system -- $SERVER
+  gemini       gemini mcp add context-system -- $SERVER
+  vs code      code --add-mcp '{"name":"context-system","command":"$UV","args":["run","--directory","$TARGET/.context","python","-m","context_store.server","mcp"]}'
+  claude       claude mcp add -s user context-system -- $SERVER
+               (a user-wide entry; .mcp.json already covers this repo)
+
+  if you registered it as "context" before, remove that entry first:
+  codex mcp remove context / agy mcp remove context / claude mcp remove -s user context
+
+anything configured by file — Cursor, Windsurf, Cline, Zed, Claude Desktop —
+takes the same de facto shape, so paste this into its mcpServers object:
+
+  "context-system": {
+    "command": "$UV",
+    "args": ["run", "--directory", "$TARGET/.context",
+             "python", "-m", "context_store.server", "mcp"]
+  }
 NEXT

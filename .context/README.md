@@ -16,7 +16,7 @@ the `context-sync` skill in one step. By hand: copy this folder to the repo root
 `.context/` and put `.mcp.json` next to it:
 
 ```json
-{"mcpServers": {"context": {"command": "uv", "args": ["run", "--project", ".context", "context", "mcp"]}}}
+{"mcpServers": {"context-system": {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}}}
 ```
 
 Needs [uv](https://docs.astral.sh/uv/). The first `uv run` builds `.venv/` and downloads the embedding model (about 30 MB) into `$FASTEMBED_CACHE_PATH`, or the temp dir if unset. Commit `memories/`; the `.gitignore` in this folder drops everything else.

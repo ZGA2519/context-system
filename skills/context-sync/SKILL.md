@@ -1,11 +1,11 @@
 ---
 name: context-sync
-description: Drives the `context` MCP server (project memory - write/select/compress/isolate over a .context/ folder) on a fixed per-turn loop so recall and capture happen every prompt instead of whenever the model happens to think of it. Provides three commands, context-start-sync, context-start-sync-readonly and context-stop-sync. Use this skill whenever the user types any of those names, with or without a leading slash, and also whenever they ask to start or stop syncing context, turn project memory on or off, sync context without writing to it, recall only, read-only context, "keep context in sync", "remember this for the project", "check the context store first", or when a repo contains a .context/ folder and the user wants past decisions honored. Also use it when a session has clearly stopped consulting project memory and needs to be put back on the loop.
+description: Drives the `context-system` MCP server (project memory - write/select/compress/isolate over a .context/ folder) on a fixed per-turn loop so recall and capture happen every prompt instead of whenever the model happens to think of it. Provides three commands, context-start-sync, context-start-sync-readonly and context-stop-sync. Use this skill whenever the user types any of those names, with or without a leading slash, and also whenever they ask to start or stop syncing context, turn project memory on or off, sync context without writing to it, recall only, read-only context, "keep context in sync", "remember this for the project", "check the context store first", or when a repo contains a .context/ folder and the user wants past decisions honored. Also use it when a session has clearly stopped consulting project memory and needs to be put back on the loop.
 ---
 
 # context-sync
 
-The `context` MCP server is a shared project memory: `memories/<scope>.jsonl` committed to git, a sqlite-vec index rebuilt from it, four operations. It works fine on its own — the problem it does not solve is *when* to call it. This skill supplies the when: two commands that flip a per-turn discipline on and off.
+The `context-system` MCP server is a shared project memory: `memories/<scope>.jsonl` committed to git, a sqlite-vec index rebuilt from it, four operations. It works fine on its own — the problem it does not solve is *when* to call it. This skill supplies the when: two commands that flip a per-turn discipline on and off.
 
 ## The server
 
@@ -91,7 +91,7 @@ Stops either mode.
 
 1. In full mode, final flush: write anything durable from this session that isn't stored yet. This is the last chance. In read-only mode, skip this — read-only means read-only right through the exit.
 2. `rm -f .context/.sync-on`.
-3. Stop calling `context` tools. Don't recall, don't write, don't offer to — until a start command comes again.
+3. Stop calling `context-system` tools. Don't recall, don't write, don't offer to — until a start command comes again.
 4. Report: `context: sync off · N written this session`, or `context: sync off · read-only, nothing written`.
 
 ## When it breaks
