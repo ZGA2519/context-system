@@ -12,7 +12,8 @@ context_store/server.py  MCP server (stdio or HTTP) and a JSON API over the same
 ## Install in a project
 
 From the context-system checkout, `./install.sh /path/to/your-repo` does this and
-the `context-sync` skill in one step. By hand: copy this folder to the repo root as
+the `context-sync` skill in one step; add `--codex`, `--gemini`, `--agy` or `--vscode`
+to register those clients as well (see `setup.sh` below). By hand: copy this folder to the repo root as
 `.context/` and put `.mcp.json` next to it:
 
 ```json
@@ -27,6 +28,13 @@ Claude Code reads `.mcp.json` and starts the server itself. Any other MCP client
 
 ```sh
 uv run --directory .context python -m context_store.server mcp
+```
+
+`setup.sh` registers that command with a client through the client's own `mcp add`, or prints every command when given no flag:
+
+```sh
+.context/setup.sh                    # print, run nothing
+.context/setup.sh --codex --gemini   # run those; also --claude --agy --vscode
 ```
 
 As a service, JSON API with docs at `/docs` and MCP at `/mcp`:

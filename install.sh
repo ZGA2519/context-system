@@ -6,10 +6,11 @@ set -eu
 SRC=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 TARGET=""
 WANT_HOOK=1
+CLIENTS=""
 
 usage() {
   cat <<'USAGE'
-usage: ./install.sh [TARGET_REPO] [--no-hook]
+usage: ./install.sh [TARGET_REPO] [--no-hook] [--claude] [--codex] [--gemini] [--agy] [--vscode]
 
 Installs into TARGET_REPO (default: the current directory):
 
@@ -23,12 +24,15 @@ Installs into TARGET_REPO (default: the current directory):
   .agent/prompts/context-*.md           the same commands, called prompts there
 
   --no-hook   skip the last two; the skill alone drives the loop
+  --claude --codex --gemini --agy --vscode
+              also register the server with those clients, via .context/setup.sh
 USAGE
 }
 
 for arg in "$@"; do
   case "$arg" in
     --no-hook) WANT_HOOK=0 ;;
+    --claude|--codex|--gemini|--agy|--vscode) CLIENTS="$CLIENTS $arg" ;;
     -h|--help) usage; exit 0 ;;
     -*) echo "install: unknown option $arg" >&2; usage >&2; exit 2 ;;
     *)
@@ -194,30 +198,9 @@ done. In that repo:
 NEXT
 
 # --- other agents ----------------------------------------------------------
-# Claude Code reads .mcp.json, written above. Every other agent keeps its MCP
-# list somewhere else, and most of them resolve nothing relative to the repo,
-# so these all spell the path out in full.
-SERVER="$UV run --directory $TARGET/.context python -m context_store.server mcp"
-cat <<NEXT
-
-to register the same server with another agent:
-
-  codex        codex mcp add context-system -- $SERVER
-  antigravity  agy mcp add context-system -- $SERVER
-  gemini       gemini mcp add context-system -- $SERVER
-  vs code      code --add-mcp '{"name":"context-system","command":"$UV","args":["run","--directory","$TARGET/.context","python","-m","context_store.server","mcp"]}'
-  claude       claude mcp add -s user context-system -- $SERVER
-               (a user-wide entry; .mcp.json already covers this repo)
-
-  if you registered it as "context" before, remove that entry first:
-  codex mcp remove context / agy mcp remove context / claude mcp remove -s user context
-
-anything configured by file — Cursor, Windsurf, Cline, Zed, Claude Desktop —
-takes the same de facto shape, so paste this into its mcpServers object:
-
-  "context-system": {
-    "command": "$UV",
-    "args": ["run", "--directory", "$TARGET/.context",
-             "python", "-m", "context_store.server", "mcp"]
-  }
-NEXT
+# Claude Code reads .mcp.json, written above. Every other client is one command
+# away; setup.sh travels with .context/ so teammates without this checkout have it too.
+echo
+if [ -n "$CLIENTS" ]; then echo "registering with:$CLIENTS"; else echo "to register the same server with another client:"; fi
+# shellcheck disable=SC2086  # CLIENTS is a flag list, splitting is the point
+sh "$TARGET/.context/setup.sh" $CLIENTS
