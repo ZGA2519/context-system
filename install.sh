@@ -53,7 +53,26 @@ fi
 HAVE_PY=1; command -v python3 >/dev/null 2>&1 || HAVE_PY=0
 HOOK_CMD='"$CLAUDE_PROJECT_DIR"/.claude/hooks/context-sync.sh'
 
-echo "installing the context system into $TARGET"
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  B=$(printf '\033[1m') D=$(printf '\033[2m') R=$(printf '\033[0m')
+  C=$(printf '\033[36m') G=$(printf '\033[32m') Y=$(printf '\033[33m') M=$(printf '\033[35m')
+else
+  B= D= R= C= G= Y= M=
+fi
+n_new=0 n_same=0 n_skip=0
+# sec <title>: section header
+sec() { printf '\n%s▌%s %s%s%s\n' "$M" "$R" "$B" "$1" "$R"; }
+# say <path> <status>: one row; glyph and color follow the status verb, counted for the summary
+say() {
+  case $2 in
+    *already*|kept*)  g="${D}•" c=$D n_same=$((n_same+1)) ;;
+    skipped*)         g="${Y}!" c=$Y n_skip=$((n_skip+1)) ;;
+    *added*|*registered|*created*|*replaced*|removed*) g="${G}✔" c=$G n_new=$((n_new+1)) ;;
+    *)                g="${G}✔" c=   n_new=$((n_new+1)) ;;
+  esac
+  printf '  %s%s %s%-28s%s %s%s%s\n' "$g" "$R" "$C" "$1" "$R" "$c" "$2" "$R"
+}
+printf '%s▌%s %scontext-system%s %s→%s %s\n\n' "$M" "$R" "$B" "$R" "$D" "$R" "$TARGET"
 
 # --- .context/ -------------------------------------------------------------
 # Everything but memories/, which is the user's data and is handled separately below.
@@ -66,7 +85,7 @@ echo "installing the context system into $TARGET"
     --exclude '*/__pycache__' \
     --exclude '*.DS_Store' \
     .context) | (cd "$TARGET" && tar xf -)
-echo "  .context/                    server, store code, pyproject"
+say .context/ "server, store code, pyproject"
 
 # --- .context/memories/ ----------------------------------------------------
 # The user's data. If memories/ is already there we do not touch it at all: no
@@ -77,16 +96,16 @@ if [ -e "$TARGET/.context/memories" ]; then
     exit 1
   }
   n=$(find "$TARGET/.context/memories" -type f -name '*.jsonl' | wc -l | tr -d ' ')
-  echo "  .context/memories/           left untouched, $n store(s) already there"
+  say .context/memories/ "kept as is, $n store$([ "$n" = 1 ] || echo s) already there"
 else
   mkdir -p "$TARGET/.context/memories"
-  echo "  .context/memories/           created"
+  stores=""
   for f in "$SRC"/.context/memories/*.jsonl; do
     [ -e "$f" ] || continue
-    base=$(basename -- "$f")
-    cp "$f" "$TARGET/.context/memories/$base"
-    echo "  .context/memories/$base new empty store"
+    cp "$f" "$TARGET/.context/memories/"
+    stores="$stores $(basename -- "$f")"
   done
+  say .context/memories/ "created, empty:$stores"
 fi
 
 # --- .mcp.json -------------------------------------------------------------
@@ -117,45 +136,46 @@ else:
     print(verb + (', legacy "context" entry removed' if stale else ""))
 PY
 )
-  echo "  .mcp.json                    mcpServers.context-system $result"
+  say .mcp.json "mcpServers.context-system $result"
 else
-  echo "  .mcp.json                    SKIPPED, no python3 — add by hand:" >&2
+  say .mcp.json "skipped, no python3. add by hand:" >&2
   echo '    {"mcpServers": {"context-system": {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}}}' >&2
 fi
 
 # --- skill and commands ----------------------------------------------------
 mkdir -p "$TARGET/.claude/skills/context-sync" "$TARGET/.claude/commands"
 cp "$SRC/skills/context-sync/SKILL.md" "$TARGET/.claude/skills/context-sync/SKILL.md"
-echo "  .claude/skills/context-sync/ SKILL.md"
+say .claude/skills/context-sync/ SKILL.md
 # Older hand-installs nested commands/ and hooks/ under the skill, where nothing
 # reads them. The real copies go to .claude/commands and .claude/hooks below.
 for stale in commands hooks; do
   d="$TARGET/.claude/skills/context-sync/$stale"
   if [ -d "$d" ]; then
     rm -rf "$d"
-    echo "  .claude/skills/context-sync/ removed stale $stale/"
+    say .claude/skills/context-sync/ "removed stale $stale/"
   fi
 done
 cp "$SRC"/skills/context-sync/commands/*.md "$TARGET/.claude/commands/"
-echo "  .claude/commands/            $(ls -1 "$SRC"/skills/context-sync/commands/*.md | wc -l | tr -d ' ') slash commands"
+ncmd=$(ls -1 "$SRC"/skills/context-sync/commands/*.md | wc -l | tr -d ' ')
+say .claude/commands/ "$ncmd slash commands"
 
 # --- .agent/ ---------------------------------------------------------------
 # The same skill and commands under the vendor-neutral tree some agents read.
 # Commands are called prompts there, so they land in .agent/prompts/.
 mkdir -p "$TARGET/.agent/skills/context-sync" "$TARGET/.agent/prompts"
 cp "$SRC/skills/context-sync/SKILL.md" "$TARGET/.agent/skills/context-sync/SKILL.md"
-echo "  .agent/skills/context-sync/  SKILL.md"
+say .agent/skills/context-sync/ SKILL.md
 cp "$SRC"/skills/context-sync/commands/*.md "$TARGET/.agent/prompts/"
-echo "  .agent/prompts/              $(ls -1 "$SRC"/skills/context-sync/commands/*.md | wc -l | tr -d ' ') prompts"
+say .agent/prompts/ "$ncmd prompts"
 
 # --- hook ------------------------------------------------------------------
 if [ "$WANT_HOOK" = 0 ]; then
-  echo "  .claude/hooks/               skipped (--no-hook)"
+  say .claude/hooks/ "skipped (--no-hook)"
 else
   mkdir -p "$TARGET/.claude/hooks"
   cp "$SRC/skills/context-sync/hooks/context-sync.sh" "$TARGET/.claude/hooks/context-sync.sh"
   chmod +x "$TARGET/.claude/hooks/context-sync.sh"
-  echo "  .claude/hooks/               context-sync.sh"
+  say .claude/hooks/ context-sync.sh
 
   if [ "$HAVE_PY" = 1 ]; then
     result=$(python3 - "$TARGET/.claude/settings.json" "$HOOK_CMD" <<'PY'
@@ -177,30 +197,32 @@ else:
     print("registered")
 PY
 )
-    echo "  .claude/settings.json        UserPromptSubmit hook $result"
+    say .claude/settings.json "UserPromptSubmit hook $result"
   else
-    echo "  .claude/settings.json        SKIPPED, no python3 — merge skills/context-sync/hooks/settings-snippet.json by hand" >&2
+    say .claude/settings.json "skipped, no python3. merge skills/context-sync/hooks/settings-snippet.json by hand" >&2
   fi
 fi
 
-UV=$(command -v uv 2>/dev/null || echo uv)
-[ "$UV" = uv ] && echo "
-note: uv is not on PATH. The server needs it: https://docs.astral.sh/uv/"
+# --- summary ---------------------------------------------------------------
+printf '\n  %s%s updated%s %s·%s %s%s unchanged%s %s·%s %s%s skipped%s\n' \
+  "$G" "$n_new" "$R" "$D" "$R" "$D" "$n_same" "$R" "$D" "$R" "$Y" "$n_skip" "$R"
+command -v uv >/dev/null 2>&1 || printf '  %s! uv is not on PATH. The server needs it: https://docs.astral.sh/uv/%s\n' "$Y" "$R"
 
-cat <<'NEXT'
-
-done. In that repo:
-  1. restart Claude Code, and approve the "context-system" server when asked (or /mcp)
-  2. /context-start-sync          recall + capture every prompt
-     /context-start-sync-readonly recall only, never writes
-     /context-stop-sync           off
-  3. commit .context/memories/ with your code; the rest of .context/ is gitignored
-NEXT
+sec "next, in that repo"
+printf '  %s1%s  restart Claude Code and approve the "context-system" server (or /mcp)\n' "$M" "$R"
+printf '  %s2%s  %s/context-start-sync%s            recall + capture every prompt\n' "$M" "$R" "$C" "$R"
+printf '     %s/context-start-sync-readonly%s   recall only, never writes\n' "$C" "$R"
+printf '     %s/context-stop-sync%s             off\n' "$C" "$R"
+printf '  %s3%s  commit .context/memories/ with your code; the rest of .context/ is gitignored\n' "$M" "$R"
 
 # --- other agents ----------------------------------------------------------
 # Claude Code reads .mcp.json, written above. Every other client is one command
 # away; setup.sh travels with .context/ so teammates without this checkout have it too.
-echo
-if [ -n "$CLIENTS" ]; then echo "registering with:$CLIENTS"; else echo "to register the same server with another client:"; fi
-# shellcheck disable=SC2086  # CLIENTS is a flag list, splitting is the point
-sh "$TARGET/.context/setup.sh" $CLIENTS
+if [ -n "$CLIENTS" ]; then
+  sec "registering with$CLIENTS"
+  # shellcheck disable=SC2086  # CLIENTS is a flag list, splitting is the point
+  sh "$TARGET/.context/setup.sh" $CLIENTS
+else
+  sec "other clients"
+  printf '  .context/setup.sh --codex --gemini --agy --vscode   %sno flag prints the commands%s\n' "$D" "$R"
+fi

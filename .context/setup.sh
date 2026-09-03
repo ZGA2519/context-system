@@ -18,7 +18,7 @@ run() {
   if [ "$DO" = 1 ] && command -v "$1" >/dev/null 2>&1; then
     printf '+ %s\n' "$*"; "$@" || printf '  %s: exited %s (already registered?)\n' "$label" "$?"; return
   fi
-  [ "$DO" = 1 ] && printf '  %-12s not on PATH, run later:\n' "$label" || printf '  %-12s' "$label"
+  [ "$DO" = 1 ] && printf '  %-12s not on PATH, run later:\n   ' "$label" || printf '  %-12s' "$label"
   for x; do case $x in *' '*|*'"'*) printf " '%s'" "$x" ;; *) printf ' %s' "$x" ;; esac; done
   echo
 }
