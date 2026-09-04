@@ -24,7 +24,7 @@ Scope names are `[a-z0-9._-]`, 64 chars max, one JSONL file each. `main` is the 
 
 1. Check the server answers: `select(query="", k=3)`. If the call errors, report that and **do not** turn sync on — say what failed and suggest `/mcp` to reconnect.
 2. Prime the session: `select(query=<what this session is about>, k=8)`. If the user gave no topic yet, the empty query from step 1 is enough.
-3. If a `.context/` directory exists, `echo full > .context/.sync-on`. This is the flag the hook reads, and its contents are the mode; harmless without the hook. It's gitignored by the install.
+3. If a `.context/` directory exists, `echo full > .context/.sync-on`. This is the flag the hook reads, and its contents are the mode; harmless without the hook. It's gitignored by the install. In a window opened over several repos, the flag belongs to the repo being synced — `<repo>/.context/.sync-on` — never the folder above them.
 4. Report in one line what came back, then run the loop below on **every** following prompt until `context-stop-sync`.
 
 ## Command: context-start-sync-readonly
@@ -90,7 +90,7 @@ Default everything to `main`. For a sub-task or a subagent that will generate a 
 Stops either mode.
 
 1. In full mode, final flush: write anything durable from this session that isn't stored yet. This is the last chance. In read-only mode, skip this — read-only means read-only right through the exit.
-2. `rm -f .context/.sync-on`.
+2. `rm -f .context/.sync-on`, in each repo it was set for.
 3. Stop calling `context-system` tools. Don't recall, don't write, don't offer to — until a start command comes again.
 4. Report: `context: sync off · N written this session`, or `context: sync off · read-only, nothing written`.
 
@@ -103,6 +103,12 @@ A tool error or an unreachable server: say it once, treat sync as off, carry on 
 These instructions live in context, so on a long or heavily compacted session the loop can quietly fade. The hard guarantee is the `UserPromptSubmit` hook at `.claude/hooks/context-sync.sh`, which re-injects the loop on every prompt as long as `.context/.sync-on` exists. `install.sh` puts it there and registers it in `.claude/settings.json`; if this repo was set up by hand or with `--no-hook`, re-run `./install.sh <this repo>` from the context-system checkout to add it. Claude Code CLI only — Cowork does not fire hooks, so there the skill-only path is all there is.
 
 The three command names are real slash commands when `install.sh` has run (they live in `.claude/commands/`, which is the only place Claude Code looks — command files sitting inside a skill folder are never registered). Without them, typing the command name as plain text works just as well.
+
+## Many repos in one window
+
+One store per repo, but the editor is often open on the folder above several of them. Running `.context/setup.sh --set-root <that folder>` inside each repo puts a `context-system-<repo>` server in the folder's `.mcp.json` — absolute path, so it starts from anywhere — copies the skill, the commands and the hook into its `.claude/`, and lists the repo in `.claude/context-sync.repos`, which is how the hook finds the members.
+
+The stores stay separate on purpose: one repo's decisions are not another's. Recall from the server that owns the files a prompt is about and write back to that same one — `context-system-api` for `api/`, `context-system-web` for `web/`. Sync is per repo too. The hook arms exactly the servers whose repo has a `.sync-on` flag, so a session can have one repo capturing, another read-only, and the rest off.
 
 ## Tuning
 
