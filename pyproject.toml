@@ -1,0 +1,18 @@
+[project]
+name = "context-system"
+version = "0.1.0"
+description = "Installer for the context system: MCP server, vector store, skill, commands, hook"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+context-system = "setup:main"
+
+# flit_core: the one backend that ships a single-file module without ever executing
+# setup.py (setuptools would run it at build time and start the wizard).
+[build-system]
+requires = ["flit_core>=3.9,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.module]
+name = "setup"

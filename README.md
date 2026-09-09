@@ -22,6 +22,13 @@ per-prompt hook. Re-run it to update an install — it never touches
 Then, in that repo: restart Claude Code, approve the `context-system` server, and
 `/context-start-sync`.
 
+No POSIX sh, or no checkout? `setup.py` is the same installer in Python, same flags:
+
+```sh
+python3 setup.py /path/to/your-repo -y        # from a checkout, or: uv run context-system
+uvx --from git+https://github.com/ZGA2519/context-system context-system   # from anywhere
+```
+
 ## Many repos in one window
 
 One store per repo, but development usually happens with the editor open on the
