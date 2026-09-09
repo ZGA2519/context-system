@@ -41,7 +41,24 @@ def test_no_hook_and_refuses_checkout():
     assert r.returncode == 1 and "source checkout" in r.stderr, r.stderr
 
 
+def test_set_root_finds_repos_below_root():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        near, deep, toodeep = root / "api", root / "a/b/web", root / "1/2/3/4/5/lost"
+        for r in (near, deep, toodeep):
+            r.mkdir(parents=True)
+            run(r, "-y", "--no-hook")
+        out = run(root, "--set-root", "-y")
+        servers = json.loads((root / ".mcp.json").read_text())["mcpServers"]
+        assert set(servers) == {"context-system-api", "context-system-web"}, servers
+        reg = (root / ".claude/context-sync.repos").read_text().splitlines()
+        assert len(reg) == 2 and str(near) in " ".join(reg) and str(deep) in " ".join(reg), reg
+        assert (root / ".claude/skills/context-sync/SKILL.md").is_file()
+        assert "lost" not in out
+
+
 if __name__ == "__main__":
     test_install_twice()
     test_no_hook_and_refuses_checkout()
+    test_set_root_finds_repos_below_root()
     print("ok")

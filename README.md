@@ -116,13 +116,14 @@ so compaction cannot erode it.
 ## Many repos in one window
 
 One store per repo, but the editor is usually open on the folder above several.
-Inside each repo:
+From that folder:
 
 ```sh
-.context/setup.sh --set-root ..
+uvx context-system --set-root        # finds every repo with a .context/ up to 5 levels down, asks which join
 ```
 
-The repo adds itself to that folder's `.mcp.json` as `context-system-<repo>` with an
+or inside each repo, `.context/setup.sh --set-root ..`. Either way the repo adds
+itself to that folder's `.mcp.json` as `context-system-<repo>` with an
 absolute path, and copies the skill, commands and hook into the folder's `.claude/`.
 Stores stay separate on purpose: one repo's decisions are not another's. Sync is
 per repo too, so one repo can be capturing while another is read-only and the rest

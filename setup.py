@@ -24,7 +24,9 @@ CLIENT_FLAGS = ["--claude", "--codex", "--gemini", "--agy", "--vscode"]
 MCP_ENTRY = {"command": "uv", "args": ["run", "--directory", ".context", "python", "-m", "context_store.server", "mcp"]}
 HOOK_CMD = '"$CLAUDE_PROJECT_DIR"/.claude/hooks/context-sync.sh'
 
-USAGE = "%(prog)s [TARGET_REPO] [-y] [--no-hook] [--claude] [--codex] [--gemini] [--agy] [--vscode]"
+USAGE = """\
+%(prog)s [TARGET_REPO] [-y] [--no-hook] [--claude] [--codex] [--gemini] [--agy] [--vscode]
+       %(prog)s [FOLDER] --set-root [-y]"""
 DESCRIPTION = """\
 Installs into TARGET_REPO (default: the current directory):
 
@@ -43,7 +45,12 @@ Installs into TARGET_REPO (default: the current directory):
 
 Anything not given is asked for interactively when there is a terminal. -y (--yes)
 answers every question with its default instead: the current directory, the hook on,
-no extra clients."""
+no extra clients.
+
+--set-root      the other job: FOLDER (default: the current directory) is a workspace
+                folder opened over several repos. Finds every repo with a .context/
+                install up to 5 levels below it, asks which should join, and runs each
+                one's .context/setup.sh --set-root FOLDER. -y takes them all."""
 
 if os.name == "nt":
     os.system("")  # ponytail: the documented hack that turns on ANSI escapes in conhost
@@ -117,11 +124,15 @@ def ask_select(title, items, default=1):
         print(f"  {Y}! pick 1-{len(items)}{R}")
 
 
-def ask_multi(title, items):
+def ask_multi(title, items, default=()):
     print(f"{M}?{R} {B}{title}{R}")
     options(items)
+    hint = "all" if len(default) == len(items) else "none"
     while True:
-        picks = ask(f"  {D}numbers, space separated (none):{R} ").split()
+        raw = ask(f"  {D}numbers, space separated, or all ({hint}):{R} ")
+        if raw.lower() == "all":
+            raw = " ".join(str(i) for i in range(1, len(items) + 1))
+        picks = raw.split() if raw else [str(p) for p in default]
         if all(p.isdigit() and 1 <= int(p) <= len(items) for p in picks):
             picks = sorted({int(p) for p in picks})
             done(title, ", ".join(items[p - 1][0] for p in picks) or "none")
@@ -156,6 +167,43 @@ def ask_path(src):
         print(f"  {Y}! {why}{R}")
 
 
+def find_repos(root, depth=5):
+    """Repos with an install (.context/setup.sh) up to `depth` directories below root."""
+    found = []
+    for d, dirs, _ in os.walk(root):
+        d = Path(d)
+        if d != root and ".context" in dirs and (d / ".context/setup.sh").is_file():
+            found.append(d)
+        deep = len(d.relative_to(root).parts) >= depth
+        dirs[:] = [] if deep else sorted(n for n in dirs if not n.startswith(".") and n != "node_modules")
+    return found
+
+
+def set_root(root, yes):
+    """Add every chosen repo below root to root's .mcp.json, via each repo's own setup.sh."""
+    root = root.resolve()
+    if not root.is_dir():
+        sys.exit(f"install: no such directory: {root}")
+    repos = find_repos(root)
+    if not repos:
+        sys.exit(f"install: no repo with a .context/ install within 5 levels below {root}")
+    reg = root / ".claude/context-sync.repos"
+    known = {line.split(" ", 1)[1] for line in reg.read_text().splitlines() if " " in line} if reg.is_file() else set()
+    items = [(str(r.relative_to(root)), "already registered here" if str(r) in known else "") for r in repos]
+    picks = list(range(1, len(items) + 1))
+    if not yes and sys.stdin.isatty() and sys.stdout.isatty():
+        print(f"\n{M}▌{R} {B}context-system{R} {D}workspace folder{R} {C}{root}{R}\n")
+        picks = ask_multi("which repos should join this folder?", items, default=picks)
+        if not picks:
+            print(f"  {D}nothing picked, nothing done{R}")
+            return
+    for i in picks:  # ponytail: shells out to setup.sh; port its set_root here if Windows needs this
+        try:
+            subprocess.run(["sh", str(repos[i - 1] / ".context/setup.sh"), "--set-root", str(root)])
+        except OSError:
+            sys.exit(f"install: no sh on PATH; run {repos[i - 1]}/.context/setup.sh --set-root {root} from a shell that has one")
+
+
 def release_ref():
     """--branch v<version> when installed from PyPI, so 0.1.1 installs the 0.1.1 tree.
     Nothing (main) when installed from a git URL or path: direct_url.json marks those."""
@@ -188,14 +236,18 @@ def main(argv=None):
     ap.add_argument("target", nargs="?", default="", metavar="TARGET_REPO")
     ap.add_argument("-y", "--yes", action="store_true")
     ap.add_argument("--no-hook", dest="hook", action="store_false", default=None)
+    ap.add_argument("--set-root", action="store_true")
     for f in CLIENT_FLAGS:
         ap.add_argument(f, dest="clients", action="append_const", const=f, default=None)
     a = ap.parse_args(argv)
     got_clients = a.clients is not None
     clients = a.clients or []
+    target = Path(a.target).expanduser() if a.target else None
+
+    if a.set_root:
+        return set_root(target or Path.cwd(), a.yes)
 
     src = source()
-    target = Path(a.target).expanduser() if a.target else None
 
     if not a.yes and sys.stdin.isatty() and sys.stdout.isatty() and (
             target is None or a.hook is None or not got_clients):
@@ -347,6 +399,7 @@ def main(argv=None):
         sec("other clients")
     print(f"  .context/setup.sh                                   {D}asks: clients, workspace folder{R}")
     print(f"  .context/setup.sh --codex --set-root <folder>       {D}--print just lists the commands{R}")
+    print(f"  {ap.prog} <folder> --set-root {' ' * max(0, 30 - len(ap.prog))}{D}finds the repos below a folder, asks which join{R}")
 
 
 if __name__ == "__main__":
