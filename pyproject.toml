@@ -1,9 +1,13 @@
 [project]
 name = "context-system"
-version = "0.1.0"
+version = "0.1.1"
 description = "Installer for the context system: MCP server, vector store, skill, commands, hook"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/ZGA2519/context-system"
 
 [project.scripts]
 context-system = "setup:main"

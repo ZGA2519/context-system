@@ -9,6 +9,7 @@ Run with no answers on a terminal and it asks for them; -y takes the defaults.
 """
 import argparse
 import atexit
+import importlib.metadata
 import json
 import os
 import shutil
@@ -155,6 +156,16 @@ def ask_path(src):
         print(f"  {Y}! {why}{R}")
 
 
+def release_ref():
+    """--branch v<version> when installed from PyPI, so 0.1.1 installs the 0.1.1 tree.
+    Nothing (main) when installed from a git URL or path: direct_url.json marks those."""
+    try:
+        dist = importlib.metadata.distribution("context-system")
+    except importlib.metadata.PackageNotFoundError:
+        return []
+    return [] if dist.read_text("direct_url.json") else ["--branch", "v" + dist.version]
+
+
 def source():
     """The checkout this file sits in, or a fresh shallow clone when installed as a tool."""
     src = Path(__file__).resolve().parent
@@ -163,7 +174,7 @@ def source():
     tmp = tempfile.TemporaryDirectory(prefix="context-system-")
     atexit.register(tmp.cleanup)
     try:
-        subprocess.run(["git", "clone", "--quiet", "--depth", "1", REPO_URL, tmp.name], check=True)
+        subprocess.run(["git", "clone", "--quiet", "--depth", "1", *release_ref(), REPO_URL, tmp.name], check=True)
     except (OSError, subprocess.CalledProcessError) as e:
         sys.exit(f"install: {src} is not a context-system checkout and cloning {REPO_URL} failed: {e}")
     return Path(tmp.name)

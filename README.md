@@ -22,12 +22,16 @@ per-prompt hook. Re-run it to update an install — it never touches
 Then, in that repo: restart Claude Code, approve the `context-system` server, and
 `/context-start-sync`.
 
-No POSIX sh, or no checkout? `setup.py` is the same installer in Python, same flags:
+No checkout, or no POSIX sh? The same installer is on PyPI, same flags:
 
 ```sh
-python3 setup.py /path/to/your-repo -y        # from a checkout, or: uv run context-system
-uvx --from git+https://github.com/ZGA2519/context-system context-system   # from anywhere
+uvx context-system                    # into the current directory
+uvx context-system /path/to/repo -y   # into that repo, defaults, no questions
 ```
+
+That fetches the release's `.context/` and `skills/` from GitHub, so it needs `git`.
+From a checkout, `python3 setup.py` or `uv run context-system` does the same;
+`uvx --from git+https://github.com/ZGA2519/context-system context-system` tracks `main`.
 
 ## Many repos in one window
 
