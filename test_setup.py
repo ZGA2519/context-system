@@ -1,5 +1,6 @@
 """python3 test_setup.py: install into a temp dir twice; files land, the re-run is a no-op."""
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -57,8 +58,45 @@ def test_set_root_finds_repos_below_root():
         assert "lost" not in out
 
 
+def test_wizard_by_keys():
+    """Drive the arrow-key wizard through a pty: down+enter picks skill only, enter twice keeps no clients and says yes."""
+    if os.name == "nt":
+        return
+    import pty
+    import select
+    import time
+    with tempfile.TemporaryDirectory() as tmp:
+        pid, fd = pty.fork()
+        if pid == 0:
+            os.environ["NO_COLOR"] = "1"
+            os.execvp(sys.executable, [sys.executable, str(HERE / "setup.py"), tmp])
+        out = b""
+
+        def until(marker, timeout=15):
+            nonlocal out
+            end = time.time() + timeout
+            while marker not in out and time.time() < end:
+                if select.select([fd], [], [], 0.1)[0]:
+                    try:
+                        out += os.read(fd, 4096)
+                    except OSError:
+                        break
+            assert marker in out, out.decode(errors="replace")
+
+        until(b"sync loop"), os.write(fd, b"\x1b[B\r")
+        until(b"other clients?"), os.write(fd, b"\r")
+        until(b"write it?"), os.write(fd, b"\r")
+        until(b"skipped (skill only)")
+        os.waitpid(pid, 0)
+        text = out.decode(errors="replace")
+        assert "\u2714 how should the sync loop stay on? \u203a skill only" in text, text
+        assert not (pathlib.Path(tmp) / ".claude/hooks").exists()
+        assert (pathlib.Path(tmp) / ".mcp.json").is_file()
+
+
 if __name__ == "__main__":
     test_install_twice()
     test_no_hook_and_refuses_checkout()
     test_set_root_finds_repos_below_root()
+    test_wizard_by_keys()
     print("ok")

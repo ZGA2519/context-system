@@ -166,8 +166,8 @@ uvx context-system --codex --vscode                 # register those clients as 
 uvx --from git+https://github.com/ZGA2519/context-system context-system   # track main
 
 git clone https://github.com/ZGA2519/context-system && cd context-system
-./install.sh /path/to/repo        # POSIX sh, the original, arrow-key wizard
-python3 setup.py /path/to/repo    # same thing in Python, plain prompts, works in cmd.exe
+./install.sh /path/to/repo        # POSIX sh, the original
+python3 setup.py /path/to/repo    # the same wizard in Python, runs in cmd.exe too
 uv run context-system --help      # everything the installer accepts
 ```
 

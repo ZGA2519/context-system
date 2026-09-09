@@ -9,6 +9,7 @@ Run with no answers on a terminal and it asks for them; -y takes the defaults.
 """
 import argparse
 import atexit
+import contextlib
 import importlib.metadata
 import json
 import os
@@ -94,66 +95,171 @@ def save_json(p, doc):
 
 
 # --- prompts ---------------------------------------------------------------
-# Plain line prompts, so they work in every terminal cmd.exe included. Only asked
-# for what the flags left open. Ctrl-C or EOF anywhere cancels with nothing written.
-def ask(prompt):
+# The same vite-style wizard install.sh has: arrows move, space toggles, enter
+# accepts, digits jump, q or Esc cancels with nothing written. Raw keys come from
+# termios on POSIX and msvcrt on Windows. Only asked for what the flags left open,
+# and only on a tty: without one the defaults apply.
+try:
+    import select
+    import termios
+    import tty
+except ImportError:  # Windows
+    import msvcrt
+    termios = None
+
+HIDE, SHOW = "\033[?25l", "\033[?25h"
+KEYS = {"\x1b[A": "up", "\x1b[B": "down", "\x1b[C": "right", "\x1b[D": "left",
+        "\x1bOA": "up", "\x1bOB": "down", "\x1bOC": "right", "\x1bOD": "left",
+        "\r": "enter", "\n": "enter", " ": "space", "\t": "down", "k": "up", "j": "down",
+        "q": "cancel", "\x1b": "cancel", "\x03": "cancel", "": "cancel"}
+
+
+@contextlib.contextmanager
+def raw():
+    """Keys unechoed and the cursor hidden for one question; both put back whatever happens.
+    Entering flushes what was typed while the last question was closing, as install.sh does."""
+    if termios:
+        fd = sys.stdin.fileno()
+        saved = termios.tcgetattr(fd)
+        tty.setcbreak(fd, termios.TCSAFLUSH)
+    print(HIDE, end="", flush=True)
     try:
-        return input(prompt).strip()
-    except (EOFError, KeyboardInterrupt):
-        print(f"\n  {Y}! cancelled, nothing written{R}")
-        sys.exit(130)
+        yield
+    finally:
+        print(SHOW, end="", flush=True)
+        if termios:
+            termios.tcsetattr(fd, termios.TCSADRAIN, saved)
 
 
-def done(title, answer):
-    print(f"{G}✔{R} {title} {D}›{R} {C}{answer}{R}")
+def _key():
+    """One keypress as the raw string it sent, escape sequence included."""
+    if termios is None:
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):  # arrow prefix, the letter after it says which
+            return {"H": "\x1b[A", "P": "\x1b[B", "M": "\x1b[C", "K": "\x1b[D"}.get(msvcrt.getwch(), "\x1b[?")
+        return ch
+    fd = sys.stdin.fileno()
+    s = os.read(fd, 1)
+    if s == b"\x1b" and select.select([fd], [], [], 0.05)[0]:  # the rest of the sequence, or a bare Esc
+        s += os.read(fd, 2)  # an arrow is ESC [ X; anything typed behind it stays for the next key
+    return s.decode(errors="replace")
 
 
-def options(items):
-    for i, (label, hint) in enumerate(items, 1):
-        print(f"  {M}{i}{R} {label:<14} {D}{hint}{R}")
+def getkey():
+    """up/down/left/right/space/enter/cancel, or the literal character."""
+    try:
+        k = _key()
+    except (KeyboardInterrupt, EOFError):
+        bail()
+    return KEYS.get(k, k)
+
+
+def bail():
+    print(f"{SHOW}\n  {Y}! cancelled, nothing written{R}")
+    sys.exit(130)
+
+
+def q_ask(title):
+    print(f"{M}?{R} {B}{title}{R}")
+
+
+def q_done(lines, title, answer):
+    """Collapse a finished question, `lines` tall, to one line."""
+    print(f"\033[{lines}A\033[J{G}✔{R} {title} {D}›{R} {C}{answer}{R}")
+
+
+def row(pointer, box, label, hint, hot):
+    print(f"  {M}{pointer}{R} {box}{C if hot else ''}{label:<14}{R} {D}{hint}{R}\033[K")
 
 
 def ask_select(title, items, default=1):
-    print(f"{M}?{R} {B}{title}{R}")
-    options(items)
-    while True:
-        a = ask(f"  {D}number ({default}):{R} ") or str(default)
-        if a.isdigit() and 1 <= int(a) <= len(items):
-            done(title, items[int(a) - 1][0])
-            return int(a)
-        print(f"  {Y}! pick 1-{len(items)}{R}")
+    """items are (label, hint); returns the 1-based choice."""
+    sel, n, drawn = default, len(items), False
+    with raw():
+        q_ask(title)
+        while True:
+            if drawn:
+                print(f"\033[{n}A", end="")
+            drawn = True
+            for i, (label, hint) in enumerate(items, 1):
+                row("❯" if i == sel else " ", "", label, hint, i == sel)
+            k = getkey()
+            if k == "up":
+                sel = sel - 1 or n
+            elif k == "down":
+                sel = sel % n + 1
+            elif k == "enter":
+                break
+            elif k == "cancel":
+                bail()
+            elif k.isdigit() and 1 <= int(k) <= n:
+                sel = int(k)
+                break
+    q_done(n + 1, title, items[sel - 1][0])
+    return sel
 
 
 def ask_multi(title, items, default=()):
-    print(f"{M}?{R} {B}{title}{R}")
-    options(items)
-    hint = "all" if len(default) == len(items) else "none"
-    while True:
-        raw = ask(f"  {D}numbers, space separated, or all ({hint}):{R} ")
-        if raw.lower() == "all":
-            raw = " ".join(str(i) for i in range(1, len(items) + 1))
-        picks = raw.split() if raw else [str(p) for p in default]
-        if all(p.isdigit() and 1 <= int(p) <= len(items) for p in picks):
-            picks = sorted({int(p) for p in picks})
-            done(title, ", ".join(items[p - 1][0] for p in picks) or "none")
-            return picks
-        print(f"  {Y}! pick from 1-{len(items)}{R}")
+    """items are (label, hint); returns the sorted 1-based picks, space toggled."""
+    cur, n, picks, drawn = 1, len(items), set(default), False
+    with raw():
+        q_ask(title)
+        while True:
+            if drawn:
+                print(f"\033[{n + 1}A", end="")
+            drawn = True
+            for i, (label, hint) in enumerate(items, 1):
+                row("❯" if i == cur else " ", f"{G}◼ {R}" if i in picks else f"{D}◻ {R}", label, hint, i == cur)
+            print(f"  {D}space toggles · enter accepts{R}\033[K")
+            k = getkey()
+            if k == "up":
+                cur = cur - 1 or n
+            elif k == "down":
+                cur = cur % n + 1
+            elif k == "space":
+                picks ^= {cur}
+            elif k == "enter":
+                break
+            elif k == "cancel":
+                bail()
+    picks = sorted(picks)
+    q_done(n + 2, title, ", ".join(items[p - 1][0] for p in picks) or "none")
+    return picks
 
 
 def ask_yesno(title, default=True):
-    while True:
-        a = ask(f"{M}?{R} {B}{title}{R} {D}({'Y/n' if default else 'y/N'}){R} ").lower()
-        if a in ("", "y", "yes", "n", "no"):
-            yes = default if a == "" else a[0] == "y"
-            done(title, "yes" if yes else "no")
-            return yes
+    yes, drawn = default, False
+    with raw():
+        q_ask(title)
+        while True:
+            if drawn:
+                print("\033[1A", end="")
+            drawn = True
+            a, b = (C, D) if yes else (D, C)
+            print(f"  {a}{'◉' if yes else '○'} yes{R}   {b}{'○' if yes else '◉'} no{R}\033[K")
+            k = getkey()
+            if k in ("left", "right", "up", "down", "space"):
+                yes = not yes
+            elif k in ("y", "Y", "n", "N"):
+                yes = k in ("y", "Y")
+                break
+            elif k == "enter":
+                break
+            elif k == "cancel":
+                bail()
+    q_done(2, title, "yes" if yes else "no")
+    return yes
 
 
 def ask_path(src):
-    """The target, asked until it is a real directory that is not the checkout."""
+    """The target, typed, asked until it is a real directory that is not the checkout."""
     default = "" if Path.cwd() == src else str(Path.cwd())
+    title = "install into which repo?"
     while True:
-        a = ask(f"{M}?{R} {B}install into which repo?{R} {D}{f'({default})' if default else ''}{R} ") or default
+        try:
+            a = input(f"{M}?{R} {B}{title}{R} {D}{f'({default})' if default else ''}{R} ").strip() or default
+        except (EOFError, KeyboardInterrupt):
+            bail()
         p = Path(a).expanduser()
         if not a:
             why = "a path is needed"
@@ -162,7 +268,7 @@ def ask_path(src):
         elif p.resolve() == src:
             why = "that is the context-system checkout; pass the repo to install into"
         else:
-            done("install into which repo?", p.resolve())
+            q_done(1, title, p.resolve())
             return p.resolve()
         print(f"  {Y}! {why}{R}")
 
