@@ -173,10 +173,12 @@ def source():
         return src
     tmp = tempfile.TemporaryDirectory(prefix="context-system-")
     atexit.register(tmp.cleanup)
-    try:
-        subprocess.run(["git", "clone", "--quiet", "--depth", "1", *release_ref(), REPO_URL, tmp.name], check=True)
+    cmd = ["git", "clone", "--quiet", "--depth", "1", *release_ref(), REPO_URL, tmp.name]
+    try:  # git still chatters on stderr for a shallow tag clone, so keep it unless it failed
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
     except (OSError, subprocess.CalledProcessError) as e:
-        sys.exit(f"install: {src} is not a context-system checkout and cloning {REPO_URL} failed: {e}")
+        why = (getattr(e, "stderr", None) or str(e)).strip()
+        sys.exit(f"install: {src} is not a context-system checkout and cloning {REPO_URL} failed:\n{why}")
     return Path(tmp.name)
 
 

@@ -1,6 +1,6 @@
 [project]
 name = "context-system"
-version = "0.1.1"
+version = "0.1.2"
 description = "Installer for the context system: MCP server, vector store, skill, commands, hook"
 readme = "README.md"
 requires-python = ">=3.12"
