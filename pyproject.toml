@@ -1,7 +1,7 @@
 [project]
 name = "context-system"
-version = "0.1.2"
-description = "Installer for the context system: MCP server, vector store, skill, commands, hook"
+version = "0.1.3"
+description = "Project memory for AI coding sessions. Lives in the repo, travels with the code, shared by every model that opens it, consulted on every prompt."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
