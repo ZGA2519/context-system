@@ -1,0 +1,50 @@
+# Every push to main publishes pyproject's version to PyPI, once. A push that does not
+# bump the version is a no-op here. The release tag is pushed first: setup.py, when
+# installed from PyPI, clones v<version> for .context/ and skills/.
+#
+# Auth is PyPI trusted publishing, no token stored anywhere. One-time setup on PyPI:
+# project context-system → Manage → Publishing → GitHub: owner ZGA2519,
+# repository context-system, workflow publish.yml, environment pypi.
+name: publish
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: write   # push the release tag
+      id-token: write   # PyPI trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+
+      - name: version, and whether PyPI has it already
+        id: v
+        run: |
+          v=$(uv version --short)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if curl -fs "https://pypi.org/pypi/context-system/$v/json" >/dev/null; then
+            echo "$v is already on PyPI, nothing to publish"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: self-check
+        if: ${{ !steps.v.outputs.skip }}
+        run: python3 test_setup.py
+
+      - name: tag v${{ steps.v.outputs.version }}
+        if: ${{ !steps.v.outputs.skip }}
+        run: |
+          t=v${{ steps.v.outputs.version }}
+          if git ls-remote --exit-code origin "refs/tags/$t" >/dev/null; then
+            echo "$t already exists on origin, keeping it"
+          else
+            git tag "$t" && git push origin "$t"
+          fi
+
+      - name: build and publish
+        if: ${{ !steps.v.outputs.skip }}
+        run: uv build && uv publish
