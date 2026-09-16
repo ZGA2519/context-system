@@ -1,12 +1,19 @@
 # context system
 
-Project memory for AI coding sessions. Lives in the repo, travels with the code,
+Project memory for AI coding sessions. Lives in the repo, versioned with the code,
 shared by every model that opens it, consulted on every prompt.
 
-Every AI session starts from zero. The decision you argued out yesterday gets
-re-argued today, the gotcha that cost an afternoon gets hit again next week, and
-the convention nobody wrote down gets broken by the next model to touch the code.
-This fixes that with three small pieces:
+
+**The problem.** Every AI session starts from zero. Yesterday's decision gets
+re-argued, last week's gotcha gets hit again, and the convention nobody wrote down
+gets broken by the next model to touch the code. Hosted memory tools fix this with
+a service outside the repo, so when the code moves, the memory does not.
+
+**What it solves.** The memory lives in the repo. A teammate gets it by pulling, a
+branch carries its own decisions, a pull request reviews a decision next to the
+change that caused it. Any model, any MCP client, no account, no network.
+
+**How.** Three small pieces, installed by one command:
 
 - **a store**: `.context/memories/*.jsonl`, one fact per line, committed. Git is the history.
 - **a server**: an MCP server over that store with four tools and a sqlite-vec index for semantic recall.
@@ -97,6 +104,13 @@ A sub-task or a sub-agent that will generate a lot of throwaway reasoning gets
 **Memory is part of the repo.** A branch has its own memory. A pull request
 reviews the memory along with the code. `git blame` on a decision works. Merge
 conflicts in a JSONL are trivial: keep both sides, ids are unique, run `compress()`.
+Checking out an old tag gives you the context that was true then, not whatever a
+central store believes today.
+
+**Sharing is `git pull`.** No hub to deploy, no account, no sync daemon, no
+access control to maintain: if someone can clone the repo, they have the memory,
+offline, in the same commit as the code it describes. Revoking access is
+revoking repo access.
 
 **No model inside the server.** Summaries in `compress` come from whichever model
 is calling. Claude writes a memory, Codex reads it, Gemini corrects it. Same store,
@@ -112,6 +126,53 @@ gets called whenever the model happens to think of it, which on a long session
 means less and less. The skill turns it into a fixed per-turn loop. The hook
 re-injects that loop on every prompt for as long as `.context/.sync-on` exists,
 so compaction cannot erode it.
+
+## How it compares
+
+Three other shapes exist. Each is better than this at something; none of them is
+memory that moves with the code.
+
+| | `AGENTS.md` / `CLAUDE.md` | hosted memory<br>(Mem0, Zep, Supermemory) | local memory server<br>(MemPalace, Basic Memory, ai-memory) | context-system |
+| --- | --- | --- | --- | --- |
+| committed in the repo | ✓ | ✗ | ✗ | ✓ |
+| branches and merges with the code | ✓ | ✗ | ✗ | ✓ |
+| reviewed in a pull request | ✓ | ✗ | ✗ | ✓ |
+| a teammate gets it by pulling | ✓ | ✗ account | ✗ hub or sync | ✓ |
+| retrieved per prompt, not loaded whole | ✗ | ✓ | ✓ | ✓ |
+| recall the model cannot skip | ✓ always in context | ✗ tool call | ~ skill or session hook | ✓ per-prompt hook |
+| no API key, no network | ✓ | ✗ | ~ varies | ✓ |
+| any model, any client | ~ convention | ~ | ✓ | ✓ |
+| nothing to run but the agent | ✓ | ✗ | ✗ server | ✓ |
+
+Two rows are the ones that matter.
+
+**A teammate gets it by pulling.** A hub gives everyone the same memory, but it
+gives everyone *the latest* memory. Check out a colleague's branch or a tag from
+three months ago and the hub still describes `main`. Here the memory is at the
+same commit as the code in front of you.
+
+**Recall the model cannot skip.** Every memory server is a tool the model calls
+when it happens to think of it, which on a long session is less and less, right
+when memory matters most. `AGENTS.md` solves that by being permanently in
+context, and pays for it in tokens on every turn whether or not it is relevant.
+The hook here re-arms a fixed recall loop on every prompt and survives
+compaction, so recall is per-prompt and scoped to the prompt.
+
+## What it is not
+
+- **Not a token reducer.** It adds a few hundred tokens a turn. It saves work, not
+  context window. Pair it with something that curates *which files* the session
+  sees if that is the problem you have.
+- **No temporal model.** Git gives you history, not queryable validity windows. If
+  you need "this fact was true between these dates," Zep's temporal graph is built
+  for that and this is not.
+- **No cross-repo graph.** One store per repo, deliberately. A graph over
+  everything your organisation knows is a different product.
+- **Repo scale, not org scale.** JSONL plus a sqlite-vec index is right for
+  thousands of memories, not millions.
+- **The write gate is still a discipline, not a solver.** The skill defines what
+  is durable and the model applies it. A store nobody prunes still decays; that is
+  what `compress` is for.
 
 ## Many repos in one window
 
