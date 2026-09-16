@@ -1,23 +1,92 @@
-# context system
+<h1 align="center">context system</h1>
 
-Project memory for AI coding sessions. Lives in the repo, versioned with the code,
-shared by every model that opens it, consulted on every prompt.
+<p align="center">
+  <strong>Project memory for AI coding sessions. Lives in the repo, travels with the code.</strong>
+</p>
 
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#the-four-operations">Four operations</a> ·
+  <a href="#how-it-compares">Compare</a> ·
+  <a href="https://github.com/ZGA2519/context-system/blob/main/.context/README.md">Store &amp; server docs</a> ·
+  <a href="https://github.com/ZGA2519/context-system/blob/main/skills/context-sync/SKILL.md">Skill protocol</a> ·
+  <a href="https://pypi.org/project/context-system/">PyPI</a>
+</p>
 
-**The problem.** Every AI session starts from zero. Yesterday's decision gets
-re-argued, last week's gotcha gets hit again, and the convention nobody wrote down
-gets broken by the next model to touch the code. Hosted memory tools fix this with
-a service outside the repo, so when the code moves, the memory does not.
+<p align="center">
+  <a href="https://pypi.org/project/context-system/"><img src="https://img.shields.io/pypi/v/context-system?style=flat-square&color=blue" alt="pypi" /></a>
+  <a href="https://github.com/ZGA2519/context-system/actions/workflows/publish.yml"><img src="https://img.shields.io/github/actions/workflow/status/ZGA2519/context-system/publish.yml?style=flat-square&label=tests" alt="tests" /></a>
+  <a href="https://github.com/ZGA2519/context-system/blob/main/LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="license" /></a>
+</p>
 
-**What it solves.** The memory lives in the repo. A teammate gets it by pulling, a
+<p align="center">
+  <strong>Memory that branches, merges and gets reviewed with the code.</strong><br/>
+  <strong>Shared by every model that opens the repo, consulted on every prompt. No hub, no account, no API key.</strong><br/>
+  <a href="#why-it-is-shaped-like-this">Read why →</a>
+</p>
+
+---
+
+Every AI session starts from zero. Yesterday's decision gets re-argued, last
+week's gotcha gets hit again, and the convention nobody wrote down gets broken by
+the next model to touch the code. Hosted memory tools fix this with a service
+outside the repo, so when the code moves, the memory does not.
+
+context system puts the memory **in the repo**. A teammate gets it by pulling, a
 branch carries its own decisions, a pull request reviews a decision next to the
-change that caused it. Any model, any MCP client, no account, no network.
+change that caused it. Any model, any MCP client.
 
-**How.** Three small pieces, installed by one command:
+| | |
+|---|---|
+| 📦 **Store** | `.context/memories/*.jsonl`, one fact per line, committed. Git is the history. |
+| 🔌 **Server** | An MCP server over that store. Four tools, a sqlite-vec index for semantic recall, no model inside. |
+| 🔁 **Discipline** | A skill and a hook that make the session recall *before* it answers and capture *after* it acts, every prompt, until told to stop. |
+| 🌿 **Branches with the code** | Check out a branch or an old tag and you get the memory that was true there, not whatever a central store believes today. |
+| 🤝 **Any model, any client** | Claude writes a memory, Codex reads it, Gemini corrects it. Same store, same file. |
 
-- **a store**: `.context/memories/*.jsonl`, one fact per line, committed. Git is the history.
-- **a server**: an MCP server over that store with four tools and a sqlite-vec index for semantic recall.
-- **a discipline**: a skill and a hook that make the session recall *before* it answers and capture *after* it acts, every prompt, until told to stop.
+---
+
+## Use context system
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<h3>🧑‍💻 I work in one repo</h3>
+
+One command installs the store, the server, the skill and the hook into the repo. Restart Claude Code, turn sync on, done.
+
+**[→ Jump to Quick start](#quick-start)**
+
+</td>
+<td width="50%" valign="top">
+
+<h3>🗂️ My editor is open on many repos</h3>
+
+One store per repo, registered into the workspace folder above them. Each repo syncs on its own.
+
+**[→ Jump to Many repos in one window](#many-repos-in-one-window)**
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+
+<h3>🔧 I use Codex, Gemini, Cursor, or want an API</h3>
+
+Any MCP client gets the same four tools. There is also an HTTP service with a JSON API.
+
+```sh
+.context/setup.sh --codex --gemini
+```
+
+**[→ Jump to Other clients](#other-clients)**
+
+</td>
+</tr>
+</table>
+
+---
 
 ## Quick start
 
@@ -36,7 +105,7 @@ That is the whole setup. Needs [uv](https://docs.astral.sh/uv/) and `git`.
 Drop the `-y` to be asked about the target, the hook and the other clients instead
 of taking the defaults.
 
-What landed in the repo:
+### What landed in the repo
 
 | path | what |
 | --- | --- |
@@ -50,19 +119,19 @@ What landed in the repo:
 Commit `.context/memories/`. Everything else under `.context/` is gitignored.
 Re-run the command any time to update an install; `memories/` is never touched.
 
-## What a session looks like
+### How it works
 
-With sync on, every prompt ends with one quiet line:
+Once sync is on, every prompt runs the same loop:
+
+1. **Recall.** Before answering, the model runs one `select` with a query built from the *intent* of your prompt and treats the hits as ground truth for this repo. If a stored decision contradicts what it was about to do, it says so instead of quietly overwriting it.
+2. **Act.** Your prompt gets answered as usual.
+3. **Capture.** After acting, it writes the durable facts it learned, one per call, correcting older memories in place rather than appending near-duplicates.
+
+Every prompt ends with one quiet line:
 
 ```
 context: 6 recalled · 1 written
 ```
-
-Before answering, the model ran one `select` with a query built from the *intent*
-of your prompt and treated the hits as ground truth for this repo. If a stored
-decision contradicts what it was about to do, it says so instead of quietly
-overwriting it. After acting, it wrote the durable facts it learned, one per call,
-correcting older memories in place rather than appending near-duplicates.
 
 A memory is one JSON line:
 
@@ -76,13 +145,15 @@ stated preference. Not durable, so it does not: transient state, file contents,
 anything re-derivable by reading the repo, general knowledge. Never: credentials,
 tokens, personal data. The store is committed and pushed.
 
-Three commands:
+### Three commands
 
 | command | does |
 | --- | --- |
 | `/context-start-sync` | recall and capture on every prompt |
 | `/context-start-sync-readonly` | recall only, writes nothing, ever. For someone else's repo, or a branch whose decisions are not settled |
 | `/context-stop-sync` | final flush of anything durable, then off |
+
+---
 
 ## The four operations
 
@@ -99,33 +170,75 @@ A sub-task or a sub-agent that will generate a lot of throwaway reasoning gets
 `isolate("task-x", seed_from="main", query=...)`, works in that scope, then
 `compress("main", ids, summary)` folds the useful residue back.
 
-## Why it is shaped like this
+---
 
-**Memory is part of the repo.** A branch has its own memory. A pull request
-reviews the memory along with the code. `git blame` on a decision works. Merge
-conflicts in a JSONL are trivial: keep both sides, ids are unique, run `compress()`.
-Checking out an old tag gives you the context that was true then, not whatever a
-central store believes today.
+## Many repos in one window
 
-**Sharing is `git pull`.** No hub to deploy, no account, no sync daemon, no
-access control to maintain: if someone can clone the repo, they have the memory,
-offline, in the same commit as the code it describes. Revoking access is
-revoking repo access.
+One store per repo, but the editor is usually open on the folder above several.
+From that folder:
 
-**No model inside the server.** Summaries in `compress` come from whichever model
-is calling. Claude writes a memory, Codex reads it, Gemini corrects it. Same store,
-same file.
+```sh
+uvx context-system --set-root        # finds every repo with a .context/ up to 5 levels down, asks which join
+```
 
-**The index is disposable.** `index.db` is a sqlite-vec index rebuilt from the JSONL
-whenever they drift. Delete it freely. Embeddings come from
-`BAAI/bge-small-en-v1.5` via fastembed, about 30 MB, downloaded on first run;
-`CONTEXT_EMBED_MODEL` picks another.
+or inside each repo, `.context/setup.sh --set-root ..`. Either way the repo adds
+itself to that folder's `.mcp.json` as `context-system-<repo>` with an
+absolute path, and copies the skill, commands and hook into the folder's `.claude/`.
+Stores stay separate on purpose: one repo's decisions are not another's. Sync is
+per repo too, so one repo can be capturing while another is read-only and the rest
+are off.
 
-**The skill solves *when*, the hook makes it stick.** A memory server on its own
-gets called whenever the model happens to think of it, which on a long session
-means less and less. The skill turns it into a fixed per-turn loop. The hook
-re-injects that loop on every prompt for as long as `.context/.sync-on` exists,
-so compaction cannot erode it.
+---
+
+## Other clients
+
+**Claude Code** · **Codex** · **Gemini CLI** · **Antigravity** · **VS Code** · **Cursor** · **Windsurf** · **Cline** · **Zed** · **Claude Desktop** · any MCP client
+
+Claude Code reads `.mcp.json` and is done. Everything else is one command away,
+and `setup.sh` ships inside `.context/` so teammates without this repo have it:
+
+```sh
+.context/setup.sh                      # asks: which clients, which workspace folder
+.context/setup.sh --codex --gemini     # also --claude --agy --vscode
+.context/setup.sh --print              # just list the commands
+```
+
+### Manual configuration
+
+Clients configured by file (Cursor, Windsurf, Cline, Zed, Claude Desktop) take
+this under `mcpServers`:
+
+```json
+"context-system": {"command": "uv", "args": ["run", "--directory", "/abs/path/to/repo/.context", "python", "-m", "context_store.server", "mcp"]}
+```
+
+### As a service
+
+A JSON API with docs at `/docs` and MCP at `/mcp`:
+
+```sh
+uv run --directory .context python -m context_store.server serve     # http://127.0.0.1:8765
+curl -s localhost:8765/select -d '{"query":"how is auth done"}' -H 'content-type: application/json'
+```
+
+### Other ways to install
+
+All of these are the same installer with the same flags. `uvx` fetches the release
+tag from GitHub, so it needs `git`; the rest run from a checkout.
+
+```sh
+uvx context-system /path/to/repo -y                 # a repo other than the current one
+uvx context-system --no-hook                        # skill only, no hook
+uvx context-system --codex --vscode                 # register those clients as you go
+uvx --from git+https://github.com/ZGA2519/context-system context-system   # track main
+
+git clone https://github.com/ZGA2519/context-system && cd context-system
+./install.sh /path/to/repo        # POSIX sh, the original
+python3 setup.py /path/to/repo    # the same wizard in Python, runs in cmd.exe too
+uv run context-system --help      # everything the installer accepts
+```
+
+---
 
 ## How it compares
 
@@ -158,7 +271,37 @@ context, and pays for it in tokens on every turn whether or not it is relevant.
 The hook here re-arms a fixed recall loop on every prompt and survives
 compaction, so recall is per-prompt and scoped to the prompt.
 
-## What it is not
+---
+
+## Why it is shaped like this
+
+**Memory is part of the repo.** A branch has its own memory. A pull request
+reviews the memory along with the code. `git blame` on a decision works. Merge
+conflicts in a JSONL are trivial: keep both sides, ids are unique, run `compress()`.
+Checking out an old tag gives you the context that was true then, not whatever a
+central store believes today.
+
+**Sharing is `git pull`.** No hub to deploy, no account, no sync daemon, no
+access control to maintain: if someone can clone the repo, they have the memory,
+offline, in the same commit as the code it describes. Revoking access is
+revoking repo access.
+
+**No model inside the server.** Summaries in `compress` come from whichever model
+is calling. Claude writes a memory, Codex reads it, Gemini corrects it. Same store,
+same file.
+
+**The index is disposable.** `index.db` is a sqlite-vec index rebuilt from the JSONL
+whenever they drift. Delete it freely. Embeddings come from
+`BAAI/bge-small-en-v1.5` via fastembed, about 30 MB, downloaded on first run;
+`CONTEXT_EMBED_MODEL` picks another.
+
+**The skill solves *when*, the hook makes it stick.** A memory server on its own
+gets called whenever the model happens to think of it, which on a long session
+means less and less. The skill turns it into a fixed per-turn loop. The hook
+re-injects that loop on every prompt for as long as `.context/.sync-on` exists,
+so compaction cannot erode it.
+
+### What it is not
 
 - **Not a token reducer.** It adds a few hundred tokens a turn. It saves work, not
   context window. Pair it with something that curates *which files* the session
@@ -174,65 +317,21 @@ compaction, so recall is per-prompt and scoped to the prompt.
   is durable and the model applies it. A store nobody prunes still decays; that is
   what `compress` is for.
 
-## Many repos in one window
-
-One store per repo, but the editor is usually open on the folder above several.
-From that folder:
-
-```sh
-uvx context-system --set-root        # finds every repo with a .context/ up to 5 levels down, asks which join
-```
-
-or inside each repo, `.context/setup.sh --set-root ..`. Either way the repo adds
-itself to that folder's `.mcp.json` as `context-system-<repo>` with an
-absolute path, and copies the skill, commands and hook into the folder's `.claude/`.
-Stores stay separate on purpose: one repo's decisions are not another's. Sync is
-per repo too, so one repo can be capturing while another is read-only and the rest
-are off.
-
-## Other clients
-
-Claude Code reads `.mcp.json` and is done. Everything else is one command away,
-and `setup.sh` ships inside `.context/` so teammates without this repo have it:
-
-```sh
-.context/setup.sh                      # asks: which clients, which workspace folder
-.context/setup.sh --codex --gemini     # also --claude --agy --vscode
-.context/setup.sh --print              # just list the commands
-```
-
-Clients configured by file (Cursor, Windsurf, Cline, Zed, Claude Desktop) take
-this under `mcpServers`:
-
-```json
-"context-system": {"command": "uv", "args": ["run", "--directory", "/abs/path/to/repo/.context", "python", "-m", "context_store.server", "mcp"]}
-```
-
-As a service, a JSON API with docs at `/docs` and MCP at `/mcp`:
-
-```sh
-uv run --directory .context python -m context_store.server serve     # http://127.0.0.1:8765
-curl -s localhost:8765/select -d '{"query":"how is auth done"}' -H 'content-type: application/json'
-```
-
-## Other ways to install
-
-All of these are the same installer with the same flags. `uvx` fetches the release
-tag from GitHub, so it needs `git`; the rest run from a checkout.
-
-```sh
-uvx context-system /path/to/repo -y                 # a repo other than the current one
-uvx context-system --no-hook                        # skill only, no hook
-uvx context-system --codex --vscode                 # register those clients as you go
-uvx --from git+https://github.com/ZGA2519/context-system context-system   # track main
-
-git clone https://github.com/ZGA2519/context-system && cd context-system
-./install.sh /path/to/repo        # POSIX sh, the original
-python3 setup.py /path/to/repo    # the same wizard in Python, runs in cmd.exe too
-uv run context-system --help      # everything the installer accepts
-```
+---
 
 ## Under the hood
+
+```
+your prompt
+    │
+    ├── hook            re-arms the skill every prompt while .context/.sync-on exists
+    ├── skill           select() before answering · write() after acting
+    │
+    └── MCP server      .context/context_store/server.py, stdio or HTTP
+            │
+            ├── store       .context/memories/<scope>.jsonl, committed, git is the history
+            └── index       .context/index.db, sqlite-vec, gitignored, rebuilt when it drifts
+```
 
 ```
 .context/
@@ -248,15 +347,24 @@ install.sh · setup.py       the installer, twice
 Tests: `uv run --group dev pytest` inside `.context/` for the store,
 `python3 test_setup.py` at the root for the installer.
 
-Docs: [.context/README.md](https://github.com/ZGA2519/context-system/blob/main/.context/README.md) for the store and server,
-[skills/context-sync/SKILL.md](https://github.com/ZGA2519/context-system/blob/main/skills/context-sync/SKILL.md) for the full per-turn protocol.
-
-## Releasing
+### Releasing
 
 Bump `version` in `pyproject.toml`, push to `main`. The workflow in
 `.github/workflows/publish.yml` tags `v<version>`, builds and publishes to PyPI with
 trusted publishing. A push that does not change the version does nothing.
 
-## License
+---
 
-[MIT](https://github.com/ZGA2519/context-system/blob/main/LICENSE.txt)
+## Links
+
+- 📖 [Store and server docs](https://github.com/ZGA2519/context-system/blob/main/.context/README.md)
+- 🔁 [The per-turn protocol, in full](https://github.com/ZGA2519/context-system/blob/main/skills/context-sync/SKILL.md)
+- 📦 [PyPI](https://pypi.org/project/context-system/)
+- 🐛 [Issues](https://github.com/ZGA2519/context-system/issues)
+- 📄 [MIT license](https://github.com/ZGA2519/context-system/blob/main/LICENSE.txt)
+
+---
+
+<p align="center">
+  <strong>Memory that moves with the code.</strong>
+</p>
