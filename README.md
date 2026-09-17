@@ -1,3 +1,13 @@
+<p align="center">
+  <a href="https://github.com/ZGA2519/context-system/blob/main/docs/banner.mp4">
+    <img src="https://raw.githubusercontent.com/ZGA2519/context-system/main/docs/banner.jpg" alt="context system — Memory that moves with the code. $ uvx context-system -y" width="100%" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/ZGA2519/context-system/blob/main/docs/banner.mp4">▶︎ Watch the 22-second intro</a>
+</p>
+
 <h1 align="center">context system</h1>
 
 <p align="center">
