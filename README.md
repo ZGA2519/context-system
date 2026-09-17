@@ -1,14 +1,8 @@
 <p align="center">
-  <a href="https://github.com/ZGA2519/context-system/blob/main/docs/banner.mp4">
-    <img src="https://raw.githubusercontent.com/ZGA2519/context-system/main/docs/banner.gif" alt="context system — Memory that moves with the code. $ uvx context-system -y" width="100%" />
-  </a>
+  <img src="https://raw.githubusercontent.com/ZGA2519/context-system/main/docs/banner.jpg" alt="context system — Memory that moves with the code. $ uvx context-system -y" width="100%" />
 </p>
 
-<p align="center">
-  <a href="https://github.com/ZGA2519/context-system/blob/main/docs/banner.mp4">▶︎ Watch with sound (mp4)</a>
-</p>
-
-<h1 align="center">context system</h1>
+<h1 align="center">Context System</h1>
 
 <p align="center">
   <strong>Project memory for AI coding sessions. Lives in the repo, travels with the code.</strong>
@@ -36,6 +30,12 @@
 </p>
 
 ---
+
+<p align="center">
+  <a href="https://github.com/ZGA2519/context-system/blob/main/docs/banner.mp4">
+    <img src="https://raw.githubusercontent.com/ZGA2519/context-system/main/docs/banner.gif" alt="22-second walkthrough: install with uvx, recall before answering, capture after acting, commit the memory with the code" width="100%" />
+  </a>
+</p>
 
 Every AI session starts from zero. Yesterday's decision gets re-argued, last
 week's gotcha gets hit again, and the convention nobody wrote down gets broken by
